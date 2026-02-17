@@ -3,6 +3,8 @@ const User = require('../models/User');
 
 // Protect routes - verify JWT token
 exports.protect = async (req, res, next) => {
+  console.log('\n🔐 AUTH MIDDLEWARE CALLED');
+  console.log('Headers:', req.headers.authorization);
   let token;
 
   // Check for token in Authorization header
@@ -14,21 +16,37 @@ exports.protect = async (req, res, next) => {
       // Get token from header
       token = req.headers.authorization.split(' ')[1];
 
+      console.log('🔐 Token received:', token.substring(0, 20) + '...');
+
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('Token decoded, userId:', decoded.userId);
 
-      // Get user from token (exclude password)
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await User.findById(decoded.userId).select('-password');
+      
+      if (!req.user) {
+        console.log('❌ User not found');
+        return res.status(401).json({ 
+          success: false,
+          message: 'User not found' 
+        });
+      }
 
+      console.log('✅ User authenticated:', req.user.email);
       next();
     } catch (error) {
-      console.error(error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      console.error('❌ Auth error:', error.message);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Not authorized, token failed' 
+      });
     }
-  }
-
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+  } else {
+    console.log('❌ No token found');
+    return res.status(401).json({ 
+      success: false,
+      message: 'Not authorized, no token' 
+    });
   }
 };
 
@@ -49,4 +67,3 @@ exports.seller = (req, res, next) => {
     res.status(403).json({ message: 'Not authorized as seller' });
   }
 };
-
